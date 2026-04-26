@@ -1,0 +1,4 @@
+interface:
+  display_name: "Fix GitHub Issue"
+  short_description: "Fix a GitHub issue and open a reviewed PR"
+  default_prompt: "Fix this GitHub issue: <issue URL>"

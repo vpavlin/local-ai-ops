@@ -1,0 +1,4 @@
+interface:
+  display_name: "Review GitHub PR"
+  short_description: "Review a GitHub PR with structured feedback"
+  default_prompt: "Review this PR: <PR URL or number>"

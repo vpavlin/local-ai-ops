@@ -1,0 +1,17 @@
+[Unit]
+Description=Codex autonomous agent (gated by Lemonade idle guard)
+After=lemonade-sampler.service
+
+[Service]
+Type=oneshot
+# Guard: exits 1 if GPU was busy within the sliding window — skips the agent run
+ExecStartPre=/usr/bin/python3 %h/.local/share/lemonade-idle/idle-guard.py
+# Replace AGENT_COMMAND with your actual codex invocation, e.g.:
+#   codex --skill gh-fix-issue "Fix next open issue in owner/repo"
+#   codex --skill gh-review-pr "Review open PRs in owner/repo"
+ExecStart=/usr/bin/bash -c 'AGENT_COMMAND'
+Environment=GPU_THRESHOLD=25
+Environment=WINDOW_S=900
+Environment=MIN_SAMPLES=10
+StandardOutput=journal
+StandardError=journal

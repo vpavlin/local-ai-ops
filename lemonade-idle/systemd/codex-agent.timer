@@ -1,0 +1,11 @@
+[Unit]
+Description=Run Codex agent every 30 minutes when Lemonade is idle
+
+[Timer]
+OnBootSec=5min
+OnUnitActiveSec=30min
+RandomizedDelaySec=2min
+Persistent=true
+
+[Install]
+WantedBy=timers.target
