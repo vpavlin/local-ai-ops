@@ -6,7 +6,7 @@ After=network.target
 ExecStart=/usr/bin/python3 %h/.local/share/lemonade-idle/sampler.py
 Restart=always
 RestartSec=10
-Environment=LEMONADE_URL=http://192.168.0.125:3000
+Environment=LEMONADE_URL=http://localhost:13305
 Environment=SAMPLE_INTERVAL_S=30
 Environment=WINDOW_S=900
 

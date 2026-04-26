@@ -10,7 +10,7 @@ import time
 import urllib.request
 import urllib.error
 
-LEMONADE_URL = os.environ.get("LEMONADE_URL", "http://192.168.0.125:3000")
+LEMONADE_URL = os.environ.get("LEMONADE_URL", "http://localhost:13305")
 INTERVAL     = int(os.environ.get("SAMPLE_INTERVAL_S", "30"))
 MAX_AGE_S    = int(os.environ.get("WINDOW_S", "900"))          # 15 minutes
 OUT_FILE     = os.environ.get("LEMONADE_STATS_FILE",
