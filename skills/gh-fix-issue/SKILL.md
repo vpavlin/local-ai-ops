@@ -48,7 +48,32 @@ Autonomous workflow for fixing a GitHub issue and shepherding the resulting PR t
    git commit -m "<summary>"
    ```
 
-## Phase 3: Open PR
+## Phase 3: Verify — must be green before any push
+
+Run each check on the committed state. **Do not push if any step fails — go back to Phase 2 and fix.**
+
+1. **Build** — compile / bundle the project:
+   - Rust: `cargo build`
+   - Node: `npm run build` or `yarn build`
+   - Python: no-op unless the project has an explicit build step
+   - Other: infer from CI config or Makefile
+
+2. **Full test suite** — run every test, not just the ones near the change:
+   - Rust: `cargo test`
+   - Node: `npm test`
+   - Python: `pytest` or `python -m pytest`
+   - Other: infer from CI config
+   
+   All tests must pass. If a pre-existing test is failing (unrelated to this change), note it explicitly in the PR body but do not suppress it.
+
+3. **Lint / type-check** — run the formatter and linter in check mode (do not auto-fix at this stage; if they need changes, go back to Phase 2 step 5):
+   - Rust: `cargo clippy -- -D warnings` and `cargo fmt --check`
+   - Node/TS: `npm run lint` and `npm run typecheck` (or equivalent)
+   - Python: `ruff check .` or `flake8`
+
+If any check fails: fix, amend the commit (`git commit --amend --no-edit` or a new commit), then re-run this entire phase from step 1.
+
+## Phase 4: Open PR
 
 Check for a PR template at `.github/PULL_REQUEST_TEMPLATE.md` and use it if present. Otherwise use a heredoc to preserve newlines and embed the full issue URL so GitHub auto-closes the issue on merge (works for same-repo and cross-repo):
 
@@ -74,7 +99,7 @@ The closing keyword (`Closes`, `Fixes`, or `Resolves`) must be followed by the *
 
 Print the PR URL.
 
-## Phase 4: CI and review loop
+## Phase 5: CI and review loop
 
 Repeat until merge-ready:
 
