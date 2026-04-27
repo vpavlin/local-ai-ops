@@ -356,9 +356,81 @@ Both services read `LAIO_CONFIG` env var for config path (defaults to `~/.config
 
 ---
 
-## Open questions
+## Decisions
 
-- [ ] Should the orchestrator re-analyse tasks that have been `failed` after N days, or require explicit `laio-admin retry`?
-- [ ] Task dedup for PRs: what if a PR gets new commits after it's already been reviewed (status=done)? Re-queue automatically or manual?
-- [ ] Do we want the dispatcher to also update skills from the repo (git pull) before each run?
-- [ ] Notification on completion (email, ntfy.sh, Slack)?
+**Failed task re-analysis**: Orchestrator re-analyses `failed` tasks on each nightly run,
+provided they haven't been retried more than `max_retries` (config, default 3). Extra
+context (e.g. new comments on the issue since failure) is appended to the existing
+analysis file rather than replacing it — preserving history. Manual `laio-admin retry`
+resets the retry counter and forces immediate re-analysis.
+
+**PR re-queue on new commits**: Orchestrator stores `head_sha` at review time. On each
+scan, if a `done` PR has a new `head_sha`, it is automatically re-queued at priority+2
+(slightly lower than fresh work) with a note in the analysis: "Previously reviewed at
+`<old_sha>` — re-queue triggered by new commits."
+
+**Skill updates before each run**: Dispatcher runs `git -C <skills_dir> pull --ff-only`
+before launching the container. Skills dir is configurable; defaults to
+`~/.codex/skills`. Failure to pull is logged but does not block the task.
+
+**Notifications**: Out of scope for now — tracked as a future Phase 8.
+
+---
+
+## Dashboard
+
+A read-only web dashboard served by `laio-admin serve`. Keeps everything in Rust, no
+extra runtime dependencies.
+
+### Quick start (while dashboard is built)
+
+[Datasette](https://datasette.io/) gives an instant zero-effort UI:
+```bash
+pip install datasette && datasette /var/lib/laio/tasks.db
+```
+Useful for ad-hoc queries during development. Not a long-term dependency.
+
+### laio-admin serve
+
+```
+laio-admin serve [--port 8080] [--bind 0.0.0.0]
+```
+
+Small `axum` HTTP server serving a single-page dashboard. Refreshes every 30s via
+`<meta http-equiv="refresh">` (no JS framework needed).
+
+**Stack**: `axum` + `askama` (compile-time HTML templates) + `sqlx` queries.
+
+**Pages / panels**:
+
+| Panel | Data source |
+|---|---|
+| Status summary | COUNT(*) GROUP BY status |
+| Active runs | endpoint_locks JOIN tasks — shows endpoint, task, lock age, last heartbeat age |
+| Recent completions (last 24h) | tasks WHERE completed_at > now-86400, sorted by completed_at DESC |
+| Failure log | tasks WHERE status='failed', error, exit_code |
+| Metrics table | P50/P95/P99 wall_seconds + avg decode_tps per type × endpoint |
+| Repo health | repo_state: last_scanned_at, open_issues, open_prs |
+| Timeout headroom | configured_timeout / max(wall_seconds) per type × endpoint — highlights when a timeout is dangerously close to the worst observed run |
+
+**Schema additions for dashboard**:
+```sql
+-- track retries
+ALTER TABLE tasks ADD COLUMN retry_count INTEGER DEFAULT 0;
+ALTER TABLE tasks ADD COLUMN head_sha TEXT;           -- for PR re-queue detection
+ALTER TABLE tasks ADD COLUMN last_analysis_at INTEGER; -- when analysis.md was last written
+```
+
+### Build phases (updated)
+
+| Phase | Scope | Deliverable |
+|---|---|---|
+| 1 | laio-common: config, DB schema + migrations, Lemonade client, idle guard | shared library |
+| 2 | laio-orchestrator: gh subprocess, LLM call, task insertion, retry + re-queue logic | working orchestrator binary |
+| 3 | laio-dispatcher: lock management, skill pull, podman launch, metric collection | working dispatcher binary |
+| 4 | Container: Dockerfile + run-task.sh + heartbeat writer | buildable image |
+| 5 | laio-admin: task CLI (list, show, retry, locks) + metrics queries | admin CLI |
+| 6 | laio-admin serve: axum dashboard | web dashboard |
+| 7 | Systemd units + install script | deployable |
+| 8 | Prometheus: swap system-stats idle check for Prometheus queries | when Lemonade metrics land |
+| 9 | Notifications (ntfy.sh or similar) | future |
