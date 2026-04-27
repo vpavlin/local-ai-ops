@@ -3,24 +3,24 @@ database:
   task_dir: ~/.local/share/laio/tasks
 
 # Orchestrator: runs nightly at 1am, makes short JSON-analysis calls.
-# Use the same Qwen3.6-35B-A3B on Bosgame — it produces far better triage
-# than any small model, and the orchestrator + dispatcher don't overlap
-# (dispatcher is idle-gated, orchestrator is scheduled at 1am).
+# K11 runs Qwen3.6-35B-A3B with -np 2 (2 parallel slots), so the
+# orchestrator and an executor can both use it concurrently.
 orchestrator:
-  endpoint: "http://192.168.0.203:8000"   # Bosgame Lemonade URL
+  endpoint: "http://192.168.0.125:13305"  # K11 Lemonade URL
   model: Qwen3.6-35B-A3B
   max_tasks_per_scan: 20
   max_retries: 3
 
 # Executors: run containerized tasks (fix-issue, review-pr).
 # Listed in preference order — first idle one is used.
+# K11 is primary (-np 2 allows concurrent orchestrator + executor use).
 executors:
-  - name: bosgame-35b
-    endpoint: "http://192.168.0.203:8000"  # Bosgame Lemonade URL
+  - name: gmktec-35b
+    endpoint: "http://192.168.0.125:13305" # K11 Lemonade URL
     model: Qwen3.6-35B-A3B
     max_concurrent: 1
-  - name: gmktec-35b
-    endpoint: "http://192.168.0.125:13305" # K11 Lemonade URL (fallback)
+  - name: bosgame-35b
+    endpoint: "http://192.168.0.203:8000"  # Bosgame Lemonade URL
     model: Qwen3.6-35B-A3B
     max_concurrent: 1
 
