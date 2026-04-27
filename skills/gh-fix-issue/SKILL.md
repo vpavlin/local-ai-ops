@@ -32,9 +32,20 @@ The main agent plans and coordinates. It spawns focused sub-agents for implement
 
 4. **Understand code style** — before touching anything, read 2–3 files near the change site to internalize naming conventions, formatting, comment density, error-handling patterns, and import order. Check for config files: `.editorconfig`, `rustfmt.toml`, `.eslintrc`, `pyproject.toml`, etc.
 
-5. **Identify test conventions** — look at existing tests near the affected code to understand the preferred style (unit vs integration, assertion library, fixture patterns).
+5. **Identify test conventions** — look at existing tests near the affected code to understand the preferred style (unit vs integration, assertion library, fixture patterns). Note what levels of testing the project already has: unit, integration, E2E, CLI.
 
-6. **Write plan.md** — capture everything the sub-agents will need. Save to `/task/plan.md`:
+6. **Plan the tests before planning the code** — think through what tests are needed at each level. For each, check whether an existing test can be extended or a new one is needed. A test that would have caught the bug before it was introduced is mandatory.
+
+   Levels to consider:
+   - **Regression**: the one test that directly reproduces the reported bug. Mandatory — this is the proof the fix is correct.
+   - **Unit**: the function(s) or method(s) being changed, with relevant inputs and edge cases.
+   - **Integration**: the interaction between components affected by the change (e.g. the module calling the changed function, the service consuming the changed API).
+   - **Flow / E2E**: the full user-visible behaviour — what a user does end-to-end and what they should see. If the project has no E2E suite, this can be a higher-level integration test or a CLI smoke test.
+   - **Edge cases**: empty inputs, boundary values, error paths, concurrent access if relevant.
+
+   For each test: prefer extending an existing test over writing a new file. Write a new test only if no existing test is close enough to extend without distorting its intent.
+
+7. **Write plan.md** — capture everything the sub-agents will need. Save to `/task/plan.md`:
    ```
    REPO: https://github.com/<owner>/<repo>
    REPO_PATH: /path/to/cloned/repo
@@ -47,6 +58,25 @@ The main agent plans and coordinates. It spawns focused sub-agents for implement
    - <file to change>: <what and why>
    - ...
 
+   TEST PLAN:
+
+   Regression (mandatory — would have caught this bug):
+   - <existing test file>::<test name> — extend with: <failing case>
+     OR new: <path>::<test name> — <what it asserts>
+
+   Unit:
+   - <function/method> — <input> → <expected>  [extend <file> OR new <file>]
+   - ...
+
+   Integration:
+   - <scenario>  [extend <file> OR new <file> OR not applicable — reason]
+
+   Flow / E2E:
+   - <user action> → <expected result>  [extend <file> OR new <file> OR not applicable — reason]
+
+   Edge cases:
+   - <input/condition> → <expected>
+
    BUILD COMMAND: <exact command>
    TEST COMMAND: <exact command>
    LINT COMMAND: <exact command>
@@ -55,13 +85,13 @@ The main agent plans and coordinates. It spawns focused sub-agents for implement
    STYLE NOTES: <brief note>
    ```
 
-7. **Spawn the implement sub-agent**:
+8. **Spawn the implement sub-agent**:
    ```bash
    codex --auto-approve-everything \
-     "Implement the fix described in /task/plan.md. The repo is already cloned and the branch is already checked out. See plan.md for exact file changes, build command, test command, and style notes. When all checks pass, commit and write a summary to /task/implement-result.md."
+     "Implement the fix described in /task/plan.md. The repo is already cloned and the branch is already checked out. See plan.md for the change plan, test plan, build/test/lint commands, and style notes. When all checks pass, commit and write a summary to /task/implement-result.md."
    ```
 
-8. **On sub-agent exit**: read `/task/implement-result.md`. If it reports failure, investigate and either fix the plan or retry. Then spawn the review sub-agent:
+9. **On sub-agent exit**: read `/task/implement-result.md`. If it reports failure, investigate and either fix the plan or retry. Then spawn the review sub-agent:
    ```bash
    codex --auto-approve-everything \
      "Review the implementation in /task/implement-result.md against /task/plan.md, do a final verify pass, then push and open the PR. See /task/plan.md for repo details and issue URL."
@@ -73,11 +103,14 @@ The main agent plans and coordinates. It spawns focused sub-agents for implement
 
 *This sub-agent receives `/task/plan.md` as its primary context. It does not re-read the issue or the contribution guide — those are already distilled in plan.md.*
 
-1. **Read plan.md** — internalize the root cause, the exact files to change, build/test/lint commands, and style notes. Do not deviate from the plan without a clear technical reason.
+1. **Read plan.md** — internalize the root cause, the change plan, the full test plan, build/test/lint commands, and style notes. Do not deviate from the plan without a clear technical reason.
 
-2. **Implement** — edit only the files listed in plan.md. Match surrounding code style exactly.
+2. **Write / extend the tests first** — before touching the implementation, work through every item in the TEST PLAN section:
+   - For each "extend" entry: open the existing test file and add the new case.
+   - For each "new" entry: create the new test file/function.
+   - Do not run the tests yet — they are expected to fail at this point. The goal is to have them written and committed to the plan before the implementation pulls your attention away.
 
-3. **Add a test** — write one test that would have caught this bug, following the test conventions in plan.md.
+3. **Implement** — edit only the files listed in the CHANGE PLAN. Match surrounding code style exactly.
 
 4. **Build → test → lint loop** — run all three checks. For each failure, fix the specific issue and re-run from the top of the loop. Do not move on until all three are green:
    - **Build**: compile/bundle (command from plan.md)
@@ -101,6 +134,14 @@ The main agent plans and coordinates. It spawns focused sub-agents for implement
    COMMIT: <hash>
    CHANGED FILES: <list>
    TEST RESULT: all pass | <N> failing (pre-existing: yes/no)
+
+   TEST PLAN COVERAGE:
+   - Regression: written (extend <file>) | written (new <file>) | MISSING — reason
+   - Unit: <count> of <count> written | MISSING: <which ones and why>
+   - Integration: written | not applicable — <reason> | MISSING — reason
+   - Flow/E2E: written | not applicable — <reason> | MISSING — reason
+   - Edge cases: <count> of <count> written
+
    SUMMARY: <one paragraph of what was done>
    NOTES: <anything the review sub-agent should know>
    ```
@@ -117,7 +158,10 @@ The main agent plans and coordinates. It spawns focused sub-agents for implement
    ```bash
    git diff main..HEAD
    ```
-   Check: does the change match what plan.md described? Is the code style consistent? Is the new test meaningful? If something looks wrong, fix it and re-commit before continuing.
+   Check three things — if any fail, fix and re-commit before continuing:
+   - Does the implementation match what plan.md described?
+   - Is the code style consistent with the surrounding code?
+   - Does the TEST PLAN COVERAGE section in implement-result.md account for every item in plan.md's TEST PLAN? Any item marked MISSING needs a justification; if the justification is weak, write the missing test now.
 
 3. **Final verify pass** — run all three checks one more time on the committed state:
    - Build
