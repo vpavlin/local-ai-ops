@@ -1,6 +1,11 @@
+mod dashboard;
+
 use anyhow::{Context, Result};
+use axum::{extract::State, response::Html, routing::get, Router};
 use clap::{Parser, Subcommand};
+use dashboard::DashboardData;
 use laio_common::{config::Config, db};
+use sqlx::sqlite::SqlitePool;
 use std::path::{Path, PathBuf};
 
 #[derive(Parser)]
@@ -31,6 +36,13 @@ enum Cmd {
     },
     /// Validate config.yaml
     Config,
+    /// Serve the web dashboard
+    Serve {
+        #[arg(long, default_value = "8080")]
+        port: u16,
+        #[arg(long, default_value = "127.0.0.1")]
+        bind: String,
+    },
 }
 
 #[derive(Subcommand)]
@@ -85,6 +97,7 @@ async fn main() -> Result<()> {
         Cmd::Metrics { action } => metrics_cmd(action, &pool).await?,
         Cmd::Locks { action } => locks_cmd(action, &pool).await?,
         Cmd::Config => config_cmd(&cfg),
+        Cmd::Serve { port, bind } => serve_cmd(pool, &bind, port).await?,
     }
     Ok(())
 }
@@ -253,4 +266,38 @@ fn fmt_ts(ts: i64) -> String {
     chrono::DateTime::from_timestamp(ts, 0)
         .map(|dt| dt.format("%Y-%m-%d %H:%M:%S UTC").to_string())
         .unwrap_or_else(|| ts.to_string())
+}
+
+// ── Dashboard server ───────────────────────────────────────────────────────────
+
+async fn serve_cmd(pool: SqlitePool, bind: &str, port: u16) -> Result<()> {
+    let addr = format!("{bind}:{port}");
+    let app = Router::new()
+        .route("/", get(dashboard_handler))
+        .with_state(pool);
+    let listener = tokio::net::TcpListener::bind(&addr).await
+        .with_context(|| format!("binding to {addr}"))?;
+    println!("laio dashboard running at http://{addr}");
+    axum::serve(listener, app).await.context("axum server")?;
+    Ok(())
+}
+
+async fn dashboard_handler(State(pool): State<SqlitePool>) -> Html<String> {
+    match build_dashboard(&pool).await {
+        Ok(data) => Html(data.render()),
+        Err(e)   => Html(format!("<pre>Error: {e}</pre>")),
+    }
+}
+
+async fn build_dashboard(pool: &SqlitePool) -> Result<DashboardData> {
+    let generated_at = chrono::Utc::now().format("%Y-%m-%d %H:%M:%S UTC").to_string();
+    let (status_counts, active_runs, recent_done, failures, metrics, repos) = tokio::try_join!(
+        db::count_by_status(pool),
+        db::active_runs(pool),
+        db::recent_completions(pool, 86400),
+        db::recent_failures(pool),
+        db::metrics_summary(pool),
+        db::list_repo_states(pool),
+    )?;
+    Ok(DashboardData { generated_at, status_counts, active_runs, recent_done, failures, metrics, repos })
 }

@@ -17,3 +17,4 @@ clap               = { workspace = true }
 chrono             = { workspace = true }
 shellexpand        = { workspace = true }
 sqlx               = { workspace = true }
+axum               = { workspace = true }

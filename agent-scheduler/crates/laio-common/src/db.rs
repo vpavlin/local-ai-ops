@@ -240,6 +240,53 @@ pub async fn list_repo_states(pool: &SqlitePool) -> Result<Vec<RepoState>> {
     Ok(rows)
 }
 
+// ── Dashboard helpers ────────────────────────────────────────────────────────
+
+pub async fn count_by_status(pool: &SqlitePool) -> Result<Vec<(String, i64)>> {
+    let rows = sqlx::query("SELECT status, COUNT(*) AS cnt FROM tasks GROUP BY status")
+        .fetch_all(pool).await?;
+    Ok(rows.iter().map(|r| (r.get::<String, _>("status"), r.get::<i64, _>("cnt"))).collect())
+}
+
+#[derive(Debug, sqlx::FromRow)]
+pub struct ActiveRun {
+    pub endpoint:     String,
+    pub task_id:      String,
+    pub locked_at:    i64,
+    pub heartbeat_at: i64,
+    pub task_type:    String,
+    pub target_url:   String,
+}
+
+pub async fn active_runs(pool: &SqlitePool) -> Result<Vec<ActiveRun>> {
+    let rows = sqlx::query_as::<_, ActiveRun>(
+        "SELECT l.endpoint, l.task_id, l.locked_at, l.heartbeat_at,
+                t.type AS task_type, t.target_url
+         FROM endpoint_locks l
+         JOIN tasks t ON t.id = l.task_id"
+    )
+    .fetch_all(pool).await?;
+    Ok(rows)
+}
+
+pub async fn recent_completions(pool: &SqlitePool, since_s: i64) -> Result<Vec<Task>> {
+    let cutoff = Utc::now().timestamp() - since_s;
+    sqlx::query_as::<_, Task>(
+        "SELECT * FROM tasks WHERE completed_at > ?
+         ORDER BY completed_at DESC LIMIT 30"
+    )
+    .bind(cutoff)
+    .fetch_all(pool).await.map_err(Into::into)
+}
+
+pub async fn recent_failures(pool: &SqlitePool) -> Result<Vec<Task>> {
+    sqlx::query_as::<_, Task>(
+        "SELECT * FROM tasks WHERE status = 'failed'
+         ORDER BY completed_at DESC LIMIT 20"
+    )
+    .fetch_all(pool).await.map_err(Into::into)
+}
+
 // ── Metrics ─────────────────────────────────────────────────────────────────
 
 #[derive(Debug, sqlx::FromRow)]

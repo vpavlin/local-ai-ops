@@ -23,5 +23,7 @@ thiserror   = "1"
 clap        = { version = "4", features = ["derive", "env"] }
 shellexpand = "3"
 dirs-next   = "2"
+axum        = "0.7"
+tower-http  = { version = "0.5", features = ["fs"] }
 
 laio-common = { path = "crates/laio-common" }
