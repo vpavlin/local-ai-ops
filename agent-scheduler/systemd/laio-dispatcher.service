@@ -1,0 +1,15 @@
+[Unit]
+Description=laio-dispatcher — select executor, launch task container, collect metrics
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=%h/.local/bin/laio-dispatcher
+Environment=LAIO_CONFIG=%h/.config/laio/config.yaml
+# GH_TOKEN must be available — set it here or in ~/.config/environment.d/laio.conf
+# Environment=GH_TOKEN=ghp_...
+
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=laio-dispatcher

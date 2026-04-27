@@ -1,0 +1,15 @@
+[Unit]
+Description=laio-orchestrator — triage GitHub repos and queue tasks
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=%h/.local/bin/laio-orchestrator
+Environment=LAIO_CONFIG=%h/.config/laio/config.yaml
+# Uncomment to override config path:
+# Environment=LAIO_CONFIG=/path/to/config.yaml
+
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=laio-orchestrator

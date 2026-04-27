@@ -1,0 +1,21 @@
+[package]
+name    = "laio-orchestrator"
+version = "0.1.0"
+edition = "2021"
+
+[[bin]]
+name = "laio-orchestrator"
+path = "src/main.rs"
+
+[dependencies]
+laio-common        = { workspace = true }
+tokio              = { workspace = true }
+tracing            = { workspace = true }
+tracing-subscriber = { workspace = true }
+anyhow             = { workspace = true }
+clap               = { workspace = true }
+serde              = { workspace = true }
+serde_json         = { workspace = true }
+chrono             = { workspace = true }
+shellexpand        = { workspace = true }
+sqlx               = { workspace = true }

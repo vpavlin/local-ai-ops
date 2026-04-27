@@ -1,0 +1,10 @@
+[Unit]
+Description=laio-orchestrator timer — run nightly at 1am
+
+[Timer]
+OnCalendar=*-*-* 01:00:00
+RandomizedDelaySec=5min
+Persistent=true
+
+[Install]
+WantedBy=timers.target

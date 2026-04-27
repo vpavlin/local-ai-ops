@@ -1,0 +1,56 @@
+database:
+  path: ~/.local/share/laio/tasks.db
+  task_dir: ~/.local/share/laio/tasks
+
+orchestrator:
+  endpoint: "http://192.168.0.125:13305"   # K11 Lemonade URL
+  model: deepseek-coder-v2-lite
+  max_tasks_per_scan: 20
+  max_retries: 3
+
+executors:
+  - name: bosgame-35b
+    endpoint: "http://192.168.0.203:8000"  # Bosgame Lemonade URL
+    model: Qwen3.6-35B-A3B
+    max_concurrent: 1
+  - name: gmktec-35b
+    endpoint: "http://192.168.0.125:13305" # K11 Lemonade URL
+    model: Qwen3.6-35B-A3B
+    max_concurrent: 1
+
+repos:
+  - url: https://github.com/example/my-repo
+    actions: [fix-issue, review-pr]
+    priority: 5
+
+timeouts:
+  default_s: 14400          # 4h
+  per_type:
+    fix-issue: 14400        # 4h
+    review-pr:  3600        # 1h
+  per_endpoint:
+    gmktec-35b: 21600       # 6h — iGPU is slower
+  heartbeat_interval_s: 120
+  heartbeat_stale_after_s: 600
+  lock_max_age_s: 86400
+
+idle_guard:
+  enabled: true
+  stats_file: ~/.local/share/lemonade-idle/gpu.jsonl
+  threshold_pct: 25.0
+  min_samples: 10
+  window_s: 900
+
+container:
+  image: local-ai-ops-runner:latest
+  runtime: podman
+  gh_token_env: GH_TOKEN
+
+skills:
+  dir: ~/.codex/skills
+  auto_update: true
+
+# Prometheus (uncomment when Lemonade exposes /metrics)
+# prometheus:
+#   endpoint: http://localhost:9090
+#   model_label: model_name

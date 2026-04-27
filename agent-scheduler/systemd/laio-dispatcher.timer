@@ -1,0 +1,10 @@
+[Unit]
+Description=laio-dispatcher timer — poll every 30min for pending tasks
+
+[Timer]
+OnBootSec=10min
+OnUnitActiveSec=30min
+RandomizedDelaySec=3min
+
+[Install]
+WantedBy=timers.target
